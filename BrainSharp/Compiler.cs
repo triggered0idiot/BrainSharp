@@ -100,8 +100,6 @@ namespace BrainSharp
             // MemoryPointer = 0
             ilProcessor.Emit(OpCodes.Ldc_I4_0);
             ilProcessor.Emit(OpCodes.Stsfld, References.MemoryPointerField);
-
-            RefreshProcessors();
         }
         
         /// <summary>
