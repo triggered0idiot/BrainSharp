@@ -43,7 +43,7 @@ namespace BrainSharp
             _outOfMemoryConstruct = targetModule.ImportReference(typeof(OutOfMemoryException).GetConstructor(Type.EmptyTypes));
             _outOfRangeConstruct = targetModule.ImportReference(typeof(ArgumentOutOfRangeException).GetConstructor(Type.EmptyTypes));
             
-            _consoleWriteMethod = targetModule.ImportReference(typeof(Console).GetMethod("Write", new []{typeof(char)}));
+            _consoleWriteMethod = targetModule.ImportReference(typeof(Console).GetMethod("Write", [typeof(char)]));
             _consoleReadMethod = targetModule.ImportReference(typeof(Console).GetMethod("Read", Type.EmptyTypes));
 
             _memoryArrayField = new FieldDefinition("Memory",
@@ -52,9 +52,6 @@ namespace BrainSharp
                 FieldAttributes.Public | FieldAttributes.Static, targetModule.TypeSystem.Int32);
             targetClass.Fields.Add(_memoryArrayField);
             targetClass.Fields.Add(_memoryPointerField);
-
-            targetMethod.Parameters.Add(new ParameterDefinition("args", ParameterAttributes.None, new ArrayType(targetModule.TypeSystem.String)));
-            targetClass.Methods.Add(targetMethod);
 
             var tempByteVar = new VariableDefinition(targetModule.TypeSystem.Byte);
             targetBody.Variables.Add(tempByteVar);

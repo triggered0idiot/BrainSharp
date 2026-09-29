@@ -72,13 +72,6 @@ namespace BrainSharp
                         module.TypeSystem.Object);
                     module.Types.Add(mainClass);
 
-                    var memoryArrayField = new FieldDefinition("Memory",
-                        FieldAttributes.Public | FieldAttributes.Static, new ArrayType(module.TypeSystem.Byte));
-                    var memoryPointerField = new FieldDefinition("MemoryPointer",
-                        FieldAttributes.Public | FieldAttributes.Static, module.TypeSystem.Int32);
-                    mainClass.Fields.Add(memoryArrayField);
-                    mainClass.Fields.Add(memoryPointerField);
-
                     var methodAttributes =
                         MethodAttributes.Public | MethodAttributes.HideBySig | MethodAttributes.Static;
                     var mainMethod = new MethodDefinition("Main", methodAttributes, module.TypeSystem.Void);

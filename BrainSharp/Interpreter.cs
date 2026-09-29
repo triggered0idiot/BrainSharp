@@ -91,7 +91,7 @@ namespace BrainSharp
                         memory[memPtr] = (byte)Console.Read();
                         break;
                 }
-                if (memPtr > highestMemAddr)
+                if (MemoryTrack && memPtr > highestMemAddr)
                 {
                     highestMemAddr = memPtr;
                     Console.WriteLine($"New highest memory address {highestMemAddr}");
@@ -99,8 +99,11 @@ namespace BrainSharp
             }
 
             Console.Write('\n');
-            highestMemAddr = Math.Max(memPtr, highestMemAddr) + 1;
-            Console.WriteLine($"Highest memory address {highestMemAddr}");
+            if(MemoryTrack)
+            {
+                highestMemAddr = Math.Max(memPtr, highestMemAddr) + 1;
+                Console.WriteLine($"Highest memory address {highestMemAddr}");
+            }
             Console.WriteLine("End of Program");
         }
     }
