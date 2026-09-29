@@ -11,6 +11,13 @@ namespace BrainSharp
 {
     internal class Program
     {
+        enum EmbedLevel
+        {
+            None,
+            Runtime,
+            All
+        }
+        
         public static void Main(string[] args)
         {
             string programPath = "main.bf";
@@ -19,7 +26,7 @@ namespace BrainSharp
             int allocatedBytes = 8192;
             
             // compiler specific
-            bool embedded = false;
+            EmbedLevel embedLevel = EmbedLevel.None;
             
             // interp specific
             bool memoryTrack = false;
@@ -51,7 +58,21 @@ namespace BrainSharp
                         compileMode = true;
                     if (string.Equals(arg, "--embedded", StringComparison.CurrentCultureIgnoreCase) ||
                         string.Equals(arg, "-e", StringComparison.CurrentCultureIgnoreCase))
-                        compileMode = true;
+                    {
+                        int newIndex = index+1;
+                        if (newIndex < args.Length)
+                        {
+                            string level = args[newIndex].ToLower();
+                            if (level is "none")
+                                embedLevel = EmbedLevel.None;
+                            else if (level is "runtime" or "brainsharp")
+                                embedLevel = EmbedLevel.Runtime;
+                            else if (level is "all")
+                                embedLevel = EmbedLevel.All;
+                            else
+                                embedLevel = EmbedLevel.All;
+                        }
+                    }
                     
                     // interp specific
                     if (string.Equals(arg, "--execute", StringComparison.CurrentCultureIgnoreCase) ||
@@ -98,12 +119,20 @@ namespace BrainSharp
                     il.Emit(OpCodes.Nop);
                     il.Emit(OpCodes.Ret);
 
-                    assembly.Write(Path.GetFileNameWithoutExtension(programPath) + ".exe");
-                }
+                    string fileName = Path.GetFileNameWithoutExtension(programPath);
+                    assembly.Write(fileName + ".exe");
 
-                if (embedded)
-                {
-                    
+                    switch (embedLevel)
+                    {
+                        case EmbedLevel.Runtime:
+                            Process.Start("ilrepack",
+                                $"/out:{fileName}.exe {fileName}.exe .\\BrainSharp.Runtime.dll");
+                            break;
+                        case EmbedLevel.All:
+                            Process.Start("ilrepack",
+                                $"/out:{fileName}.exe {fileName}.exe .\\System.Memory.dll .\\BrainSharp.Runtime.dll");
+                            break;
+                    }
                 }
 
                 Console.WriteLine($"Program '{Path.GetFileNameWithoutExtension(programPath) + ".exe"}' compiled successfully!");
