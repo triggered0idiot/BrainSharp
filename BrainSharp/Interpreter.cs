@@ -29,80 +29,88 @@ namespace BrainSharp
         /// <exception cref="InvalidLoopException">The code contains a '[' that isn't followed by a corresponding ']'</exception>
         public static void Run(string code)
         {
-            int highestMemAddr = 0;
-            Stack<LoopData> loops = new Stack<LoopData>();
             byte[] memory = new byte[AllocatedBytes];
-            int memPtr = 0;
-            int ptr = -1;
-            while (++ptr < code.Length)
+            using(var watcher = new BrainFuckExceptionHandler(code, memory))
             {
-                char c = code[ptr];
-                int tempPtr;
-                switch (c)
+                int highestMemAddr = 0;
+                Stack<LoopData> loops = new Stack<LoopData>();
+                int memPtr = 0;
+                int ptr = -1;
+                while (++ptr < code.Length)
                 {
-                    case '+':
-                        memory[memPtr]++;
-                        break;
-                    case '-':
-                        memory[memPtr]--;
-                        break;
-                    case '>':
-                        memPtr++;
-                        if (memPtr >= memory.Length)
-                            throw new MemoryPointerOutOfBounds("The memory pointer has overflown past the maximum index.");
-                        break;
-                    case '<':
-                        memPtr--;
-                        if (memPtr < 0)
-                            throw new MemoryPointerOutOfBounds("The memory pointer has underflow past 0.");
-                        break;
-                    case '[':
-                        int b = 1;
-                        tempPtr = ptr;
-                        while (b > 0)
-                        {
-                            tempPtr++;
-                            if (tempPtr >= code.Length)
-                                throw new InvalidLoopException("Cannot start a loop '[' without an ending ']'");
+                    char c = code[ptr];
+                    watcher.CurrentCharacterIndex = ptr;
+                    watcher.CurrentMemorySpaceIndex = memPtr;
+                    switch (c)
+                    {
+                        case '+':
+                            memory[memPtr]++;
+                            break;
+                        case '-':
+                            memory[memPtr]--;
+                            break;
+                        case '>':
+                            memPtr++;
+                            watcher.CurrentMemorySpaceIndex = memPtr;
+                            if (memPtr >= memory.Length)
+                                throw new MemoryPointerOutOfBounds(MemoryPointerOutOfBounds.Overflow);
+                            break;
+                        case '<':
+                            memPtr--;
+                            watcher.CurrentMemorySpaceIndex = memPtr;
+                            if (memPtr < 0)
+                                throw new MemoryPointerOutOfBounds(MemoryPointerOutOfBounds.Underflow);
+                            break;
+                        case '[':
+                            int b = 1;
+                            var tempPtr = ptr;
+                            while (b > 0)
+                            {
+                                tempPtr++;
+                                if (tempPtr >= code.Length)
+                                    throw new InvalidLoopException("Cannot start a loop '[' without an ending ']'");
 
-                            if (code[tempPtr] == ']')
-                                b--;
-                            else if (code[tempPtr] == '[')
-                                b++;
-                        }
+                                if (code[tempPtr] == ']')
+                                    b--;
+                                else if (code[tempPtr] == '[')
+                                    b++;
+                            }
 
-                        loops.Push(new LoopData { StartBracket = ptr, EndBracket = tempPtr });
-                        if (memory[memPtr] == 0)
-                        {
-                            ptr = tempPtr;
-                            loops.Pop();
-                        }
-                        break;
-                    case ']':
-                        if (memory[memPtr] != 0)
-                            ptr = loops.Peek().StartBracket;
-                        else
-                            loops.Pop();
-                        break;
-                    case '.':
-                        Console.Write((char)memory[memPtr]);
-                        break;
-                    case ',':
-                        memory[memPtr] = (byte)Console.Read();
-                        break;
+                            loops.Push(new LoopData { StartBracket = ptr, EndBracket = tempPtr });
+                            if (memory[memPtr] == 0)
+                            {
+                                ptr = tempPtr;
+                                loops.Pop();
+                            }
+
+                            break;
+                        case ']':
+                            if (memory[memPtr] != 0)
+                                ptr = loops.Peek().StartBracket;
+                            else
+                                loops.Pop();
+                            break;
+                        case '.':
+                            Console.Write((char)memory[memPtr]);
+                            break;
+                        case ',':
+                            memory[memPtr] = (byte)Console.Read();
+                            break;
+                    }
+
+                    if (MemoryTrack && memPtr > highestMemAddr)
+                    {
+                        highestMemAddr = memPtr;
+                        Console.WriteLine($"New highest memory address {highestMemAddr}");
+                    }
                 }
-                if (MemoryTrack && memPtr > highestMemAddr)
+
+                Console.Write('\n');
+                if (MemoryTrack)
                 {
-                    highestMemAddr = memPtr;
-                    Console.WriteLine($"New highest memory address {highestMemAddr}");
+                    highestMemAddr = Math.Max(memPtr, highestMemAddr) + 1;
+                    Console.WriteLine($"Highest memory address {highestMemAddr}");
                 }
-            }
-
-            Console.Write('\n');
-            if(MemoryTrack)
-            {
-                highestMemAddr = Math.Max(memPtr, highestMemAddr) + 1;
-                Console.WriteLine($"Highest memory address {highestMemAddr}");
             }
             Console.WriteLine("End of Program");
         }

@@ -17,6 +17,11 @@ namespace BrainSharp
             bool compileMode = true;
             bool includeSafetyChecks = false;
             int allocatedBytes = 8192;
+            
+            // compiler specific
+            bool embedded = false;
+            
+            // interp specific
             bool memoryTrack = false;
             
             // very crude argument reader
@@ -43,6 +48,9 @@ namespace BrainSharp
                     // compiler specific
                     if (string.Equals(arg, "--compile", StringComparison.CurrentCultureIgnoreCase) ||
                         string.Equals(arg, "-c", StringComparison.CurrentCultureIgnoreCase))
+                        compileMode = true;
+                    if (string.Equals(arg, "--embedded", StringComparison.CurrentCultureIgnoreCase) ||
+                        string.Equals(arg, "-e", StringComparison.CurrentCultureIgnoreCase))
                         compileMode = true;
                     
                     // interp specific
@@ -91,6 +99,11 @@ namespace BrainSharp
                     il.Emit(OpCodes.Ret);
 
                     assembly.Write(Path.GetFileNameWithoutExtension(programPath) + ".exe");
+                }
+
+                if (embedded)
+                {
+                    
                 }
 
                 Console.WriteLine($"Program '{Path.GetFileNameWithoutExtension(programPath) + ".exe"}' compiled successfully!");
