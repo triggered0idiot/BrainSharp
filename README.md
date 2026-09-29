@@ -9,9 +9,9 @@ i'll probably add a bit more features if i get bored again (raylib??? jk) and ma
 (arg 1 has to be the program)<br>
 (example: ./BrainSharp.exe helloworld.bf --safe --allocate 7 --compile)<br>
 --unsafe | -u<br>
-disables bounds checks<br>
+disables bounds checks, proper error handling and program debug information<br>
 --safe | -s<br>
-enables bounds checks<br>
+enables bounds checks, proper error handling and program debug information<br>
 --allocate x | -a x<br>
 specific allocated bytes to brainfuck program<br>
 --compile | -c<br>

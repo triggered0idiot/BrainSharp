@@ -2,7 +2,7 @@
 Microsoft Visual Studio Solution File, Format Version 12.00
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BrainSharp", "BrainSharp\BrainSharp.csproj", "{61C2BED0-0CA7-4D6E-BB97-6B36472C7DB1}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BrainSharp Runtime", "BrainSharp Runtime\BrainSharp Runtime.csproj", "{5E8DADC3-5941-487F-8B18-17D35033B7DF}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BrainSharp.Runtime", "BrainSharp.Runtime\BrainSharp.Runtime.csproj", "{5E8DADC3-5941-487F-8B18-17D35033B7DF}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

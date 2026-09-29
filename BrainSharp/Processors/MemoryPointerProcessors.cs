@@ -1,0 +1,85 @@
+using BrainSharp.Runtime.Exceptions;
+using Mono.Cecil.Cil;
+
+namespace BrainSharp.Processors
+{
+    public class IncrementMemoryPointerProcessor : IBrainFuckCharacterProcessor
+    {
+        public bool FlagCharacter(string code, int currentCharacterIndex)
+        {
+            return code[currentCharacterIndex] == '>';
+        }
+
+        public void ProcessCharacter(string code, ref int currentCharacterIndex, ILProcessor processor,
+            Compiler compiler)
+        {
+            var references = compiler.References;
+            // memoryPointer++
+            processor.Emit(OpCodes.Ldsfld, references.MemoryPointerField);
+            processor.Emit(OpCodes.Ldc_I4_1);
+            processor.Emit(OpCodes.Add);
+            processor.Emit(OpCodes.Stsfld, references.MemoryPointerField);
+                        
+            if(compiler.IncludeSafetyChecks)
+            {
+                processor.Emit(OpCodes.Ldloc, references.ExceptionHandlerVariable);
+                processor.Emit(OpCodes.Ldsfld, references.MemoryPointerField);
+                processor.Emit(OpCodes.Stfld, references.ExceptionHandlerCurrentMemoryPointerField);
+                            
+                // if (MemoryPointer < Memory.Length)
+                processor.Emit(OpCodes.Ldsfld, references.MemoryPointerField);
+                processor.Emit(OpCodes.Ldsfld, references.MemoryArrayField);
+                processor.Emit(OpCodes.Ldlen);
+                processor.Emit(OpCodes.Conv_I4);
+
+                var nopEnd = Instruction.Create(OpCodes.Nop);
+                var nopEnd2 = Instruction.Create(OpCodes.Nop);
+                processor.Emit(OpCodes.Bge, nopEnd);
+                processor.Emit(OpCodes.Br, nopEnd2);
+                processor.Append(nopEnd);
+                processor.Emit(OpCodes.Ldstr, MemoryPointerOutOfBounds.Overflow);
+                processor.Emit(OpCodes.Newobj, references.PtrOutOfBoundsConstructor);
+                processor.Emit(OpCodes.Throw);
+                processor.Append(nopEnd2);
+            }
+        }
+    }
+    
+    public class DecrementMemoryPointerProcessor : IBrainFuckCharacterProcessor
+    {
+        public bool FlagCharacter(string code, int currentCharacterIndex)
+        {
+            return code[currentCharacterIndex] == '<';
+        }
+
+        public void ProcessCharacter(string code, ref int currentCharacterIndex, ILProcessor processor,
+            Compiler compiler)
+        {
+            var references = compiler.References;
+            // memoryPointer--
+            processor.Emit(OpCodes.Ldsfld, references.MemoryPointerField);
+            processor.Emit(OpCodes.Ldc_I4_1);
+            processor.Emit(OpCodes.Sub);
+            processor.Emit(OpCodes.Stsfld, references.MemoryPointerField);
+                        
+            if(compiler.IncludeSafetyChecks)
+            {
+                processor.Emit(OpCodes.Ldloc, references.ExceptionHandlerVariable);
+                processor.Emit(OpCodes.Ldsfld, references.MemoryPointerField);
+                processor.Emit(OpCodes.Stfld, references.ExceptionHandlerCurrentMemoryPointerField);
+                            
+                // if (0 > MemoryPointer)
+                processor.Emit(OpCodes.Ldc_I4_0);
+                processor.Emit(OpCodes.Ldsfld, references.MemoryPointerField);
+                processor.Emit(OpCodes.Cgt);
+
+                var nopEnd = Instruction.Create(OpCodes.Nop);
+                processor.Emit(OpCodes.Brfalse, nopEnd);
+                processor.Emit(OpCodes.Ldstr, MemoryPointerOutOfBounds.Underflow);
+                processor.Emit(OpCodes.Newobj, references.PtrOutOfBoundsConstructor);
+                processor.Emit(OpCodes.Throw);
+                processor.Append(nopEnd);
+            }
+        }
+    }
+}

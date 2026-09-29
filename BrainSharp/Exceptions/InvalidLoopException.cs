@@ -1,4 +1,11 @@
 using System;
 
-namespace BrainSharp.Exceptions;
-public class InvalidLoopException(string message) : BrainFuckSyntaxException(message);
+namespace BrainSharp.Exceptions
+{
+    public class InvalidLoopException : BrainFuckSyntaxException
+    {
+        public InvalidLoopException(string message) : base(message)
+        {
+        }
+    }
+}

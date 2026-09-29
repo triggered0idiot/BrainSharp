@@ -1,9 +1,13 @@
 using System;
+using System.Collections.Generic;
+using System.Reflection;
 using System.Text;
 using BrainSharp.Exceptions;
+using BrainSharp.Processors;
 using BrainSharp.Runtime.Exceptions;
 using Mono.Cecil;
 using Mono.Cecil.Cil;
+using FieldAttributes = Mono.Cecil.FieldAttributes;
 
 namespace BrainSharp
 {
@@ -12,26 +16,35 @@ namespace BrainSharp
     /// </summary>
     public class Compiler
     {
+        public static readonly List<IBrainFuckCharacterProcessor> CharacterProcessors = new();
+        static Compiler() // autoload processors
+        {
+            RefreshProcessors();
+        }
+        public static void RefreshProcessors()
+        {
+            CharacterProcessors.Clear();
+            foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
+            {
+                var t = asm.GetTypes();
+                foreach (var type in t)
+                {
+                    if (type.GetInterface("IBrainFuckCharacterProcessor") != null)
+                    {
+                        Console.WriteLine($"Found processor {type.FullName}");
+                        var constructor = type.GetConstructor(Type.EmptyTypes);
+                        CharacterProcessors.Add(constructor?.Invoke(null) as IBrainFuckCharacterProcessor);
+                    }
+                }
+            }
+        }
+        
+        
         public readonly bool IncludeSafetyChecks;
         public readonly int AllocatedBytes;
         
-        private readonly ILProcessor _ilProcessor;
+        public readonly CompilerReferences References = new();
         
-        private readonly MethodReference _ptrOutOfBoundsConstructor;
-        
-        private readonly MethodReference _consoleWriteMethod;
-        private readonly MethodReference _consoleReadMethod;
-        
-        private readonly FieldDefinition _memoryArrayField;
-        private readonly FieldDefinition _memoryPointerField;
-
-        private readonly TypeReference _exceptionHandlerType;
-        private readonly MethodReference _exceptionHandlerConstructor;
-        private readonly FieldReference _exceptionHandlerCurrentCharacterField;
-        private readonly FieldReference _exceptionHandlerCurrentMemoryPointerField;
-        private readonly MethodReference _memoryByteConstructor;
-        private readonly MethodReference _disposeMethod;
-
         /// <summary>
         /// Creates the compiler with a targeted il processor
         /// TODO: Requires the processor to be in a class that has been init-ed by Compiler.PrepareClass
@@ -41,51 +54,56 @@ namespace BrainSharp
         /// <param name="allocatedBytes">How much memory space to allocate to the program, unlike some other brainfuck interpreters memory isn't allocated dynamically</param>
         public Compiler(ILProcessor ilProcessor, bool includeSafetyChecks = false, int allocatedBytes = 8192)
         {
-            _ilProcessor = ilProcessor;
+            References.IlProcessor = ilProcessor;
             IncludeSafetyChecks = includeSafetyChecks;
             AllocatedBytes = allocatedBytes;
 
-            var targetBody = _ilProcessor.Body;
-            var targetMethod = _ilProcessor.Body.Method;
-            var targetClass = _ilProcessor.Body.Method.DeclaringType;
-            var targetModule = _ilProcessor.Body.Method.DeclaringType.Module;
+            var targetBody = ilProcessor.Body;
+            var targetMethod = ilProcessor.Body.Method;
+            var targetClass = ilProcessor.Body.Method.DeclaringType;
+            var targetModule = ilProcessor.Body.Method.DeclaringType.Module;
             var byteType = targetModule.ImportReference(typeof(byte));
             
-            _ptrOutOfBoundsConstructor = targetModule.ImportReference(typeof(MemoryPointerOutOfBounds).GetConstructor([typeof(string)]));
+            References.PtrOutOfBoundsConstructor = targetModule.ImportReference(typeof(MemoryPointerOutOfBounds).GetConstructor(
+                new[] { typeof(string) }));
             
-            _exceptionHandlerType = targetModule.ImportReference(typeof(BrainFuckExceptionHandler));
-            _exceptionHandlerConstructor = targetModule.ImportReference(typeof(BrainFuckExceptionHandler).GetConstructor([typeof(string), typeof(Memory<byte>)]));
-            _exceptionHandlerCurrentCharacterField =
+            References.ExceptionHandlerType = targetModule.ImportReference(typeof(BrainFuckExceptionHandler));
+            References.ExceptionHandlerConstructor = targetModule.ImportReference(typeof(BrainFuckExceptionHandler).GetConstructor(
+                new[] { typeof(string), typeof(Memory<byte>) }));
+            References.ExceptionHandlerCurrentCharacterField =
                 targetModule.ImportReference(typeof(BrainFuckExceptionHandler).GetField("CurrentCharacterIndex"));
-            _exceptionHandlerCurrentMemoryPointerField =
+            References.ExceptionHandlerCurrentMemoryPointerField =
                 targetModule.ImportReference(typeof(BrainFuckExceptionHandler).GetField("CurrentMemorySpaceIndex"));
-            _disposeMethod =
+            References.DisposeMethod =
                 targetModule.ImportReference(typeof(IDisposable).GetMethod("Dispose"));
-            _memoryByteConstructor = 
-                targetModule.ImportReference(typeof(Memory<byte>).GetConstructor([typeof(byte[])]));
+            References.MemoryByteConstructor = 
+                targetModule.ImportReference(typeof(Memory<byte>).GetConstructor(new[] { typeof(byte[]) }));
             
-            _consoleWriteMethod = targetModule.ImportReference(typeof(Console).GetMethod("Write", [typeof(char)]));
-            _consoleReadMethod = targetModule.ImportReference(typeof(Console).GetMethod("Read", Type.EmptyTypes));
+            References.ConsoleWriteMethod = targetModule.ImportReference(typeof(Console).GetMethod("Write",
+                new[] { typeof(char) }));
+            References.ConsoleReadMethod = targetModule.ImportReference(typeof(Console).GetMethod("Read", Type.EmptyTypes));
 
-            _memoryArrayField = new FieldDefinition("Memory",
+            References.MemoryArrayField = new FieldDefinition("Memory",
                 FieldAttributes.Public | FieldAttributes.Static, new ArrayType(targetModule.TypeSystem.Byte));
-            _memoryPointerField = new FieldDefinition("MemoryPointer",
+            References.MemoryPointerField = new FieldDefinition("MemoryPointer",
                 FieldAttributes.Public | FieldAttributes.Static, targetModule.TypeSystem.Int32);
-            targetClass.Fields.Add(_memoryArrayField);
-            targetClass.Fields.Add(_memoryPointerField);
+            targetClass.Fields.Add(References.MemoryArrayField);
+            targetClass.Fields.Add(References.MemoryPointerField);
 
             var tempByteVar = new VariableDefinition(targetModule.TypeSystem.Byte);
             targetBody.Variables.Add(tempByteVar);
             
             // Memory = new byte[AllocatedBytes]
-            _ilProcessor.Emit(OpCodes.Ldc_I4, AllocatedBytes);
-            _ilProcessor.Emit(OpCodes.Newarr, byteType);
-            _ilProcessor.Emit(OpCodes.Stsfld, _memoryArrayField);
+            ilProcessor.Emit(OpCodes.Ldc_I4, AllocatedBytes);
+            ilProcessor.Emit(OpCodes.Newarr, byteType);
+            ilProcessor.Emit(OpCodes.Stsfld, References.MemoryArrayField);
             // MemoryPointer = 0
-            _ilProcessor.Emit(OpCodes.Ldc_I4_0);
-            _ilProcessor.Emit(OpCodes.Stsfld, _memoryPointerField);
-        }
+            ilProcessor.Emit(OpCodes.Ldc_I4_0);
+            ilProcessor.Emit(OpCodes.Stsfld, References.MemoryPointerField);
 
+            RefreshProcessors();
+        }
+        
         /// <summary>
         /// Compiles brainfuck code, appends compiled code to the current il processor
         /// </summary>
@@ -93,10 +111,11 @@ namespace BrainSharp
         /// <exception cref="InvalidLoopException">The code contains a '[' that isn't followed by a corresponding ']'</exception>
         public void Compile(string code)
         {
+            var ilProcessor = References.IlProcessor;
             if(IncludeSafetyChecks)
             {
-                var exceptionHandlerVariable = new VariableDefinition(_exceptionHandlerType);
-                _ilProcessor.Body.Variables.Add(exceptionHandlerVariable);
+                References.ExceptionHandlerVariable = new VariableDefinition(References.ExceptionHandlerType);
+                ilProcessor.Body.Variables.Add(References.ExceptionHandlerVariable);
 
                 var endInstruction = Instruction.Create(OpCodes.Nop);
                 var tryStart = Instruction.Create(OpCodes.Nop);
@@ -105,28 +124,28 @@ namespace BrainSharp
                 var endFinally = Instruction.Create(OpCodes.Endfinally);
                 var finallyEnd = Instruction.Create(OpCodes.Nop);
                 // using
-                _ilProcessor.Emit(OpCodes.Ldstr, code);
-                _ilProcessor.Emit(OpCodes.Ldsfld, _memoryArrayField);
-                _ilProcessor.Emit(OpCodes.Newobj, _memoryByteConstructor);
-                _ilProcessor.Emit(OpCodes.Newobj, _exceptionHandlerConstructor);
-                _ilProcessor.Emit(OpCodes.Stloc, exceptionHandlerVariable);
+                ilProcessor.Emit(OpCodes.Ldstr, code);
+                ilProcessor.Emit(OpCodes.Ldsfld, References.MemoryArrayField);
+                ilProcessor.Emit(OpCodes.Newobj, References.MemoryByteConstructor);
+                ilProcessor.Emit(OpCodes.Newobj, References.ExceptionHandlerConstructor);
+                ilProcessor.Emit(OpCodes.Stloc, References.ExceptionHandlerVariable);
 
-                _ilProcessor.Append(tryStart);
-                _compilerIteration(code, exceptionHandlerVariable);
+                ilProcessor.Append(tryStart);
+                CompilerIteration(code);
 
-                _ilProcessor.Emit(OpCodes.Leave, endInstruction);
+                ilProcessor.Emit(OpCodes.Leave, endInstruction);
                 //_ilProcessor.Append(tryEnd);
 
-                _ilProcessor.Append(finallyStart);
-                _ilProcessor.Emit(OpCodes.Ldloc, exceptionHandlerVariable);
-                _ilProcessor.Emit(OpCodes.Brfalse, endFinally);
+                ilProcessor.Append(finallyStart);
+                ilProcessor.Emit(OpCodes.Ldloc, References.ExceptionHandlerVariable);
+                ilProcessor.Emit(OpCodes.Brfalse, endFinally);
 
-                _ilProcessor.Emit(OpCodes.Ldloc, exceptionHandlerVariable);
-                _ilProcessor.Emit(OpCodes.Callvirt, _disposeMethod);
+                ilProcessor.Emit(OpCodes.Ldloc, References.ExceptionHandlerVariable);
+                ilProcessor.Emit(OpCodes.Callvirt, References.DisposeMethod);
 
-                _ilProcessor.Append(endFinally);
-                _ilProcessor.Append(finallyEnd);
-                _ilProcessor.Append(endInstruction);
+                ilProcessor.Append(endFinally);
+                ilProcessor.Append(finallyEnd);
+                ilProcessor.Append(endInstruction);
 
                 var handler = new ExceptionHandler(ExceptionHandlerType.Finally)
                 {
@@ -135,110 +154,141 @@ namespace BrainSharp
                     HandlerStart = finallyStart,
                     HandlerEnd = finallyEnd,
                 };
-                _ilProcessor.Body.ExceptionHandlers.Add(handler);
+                ilProcessor.Body.ExceptionHandlers.Add(handler);
             }
             else
-                _compilerIteration(code, null);
+                CompilerIteration(code);
         }
 
-        private void _compilerIteration(string code, VariableDefinition exceptionHandlerVariable, int ptrOffset = 0)
+        internal void CompilerIteration(string code, int ptrOffset = 0)
         {
+            var ilProcessor = References.IlProcessor;
             int ptr = -1;
             while (++ptr < code.Length)
             {
-                char c = code[ptr];
-                int tempPtr;
-                Instruction nopEnd;
-
-                if (IncludeSafetyChecks)
+                bool processed = false;
+                foreach (var processor in CharacterProcessors)
                 {
-                    _ilProcessor.Emit(OpCodes.Ldloc, exceptionHandlerVariable);
-                    _ilProcessor.Emit(OpCodes.Ldc_I4, ptr + ptrOffset);
-                    _ilProcessor.Emit(OpCodes.Stfld, _exceptionHandlerCurrentCharacterField);
+                    if (processor.FlagCharacter(code, ptr))
+                    {
+                        processor.ProcessCharacter(code, ref ptr, ilProcessor, this);
+                        processed = true;
+                    }
                 }
+                
+                if(processed)
+                {
+                    var nop = Instruction.Create(OpCodes.Nop);
+                    
+                    // TODO: fix/impl properly maybe?
+                    /*
+                    var sequencePoint = new SequencePoint(nop, new Document("main.bf"))
+                    {
+                        StartLine = lineCount + lineOffset,
+                        StartColumn = columnCount + columnOffset,
+                        EndLine = lineCount + lineOffset,
+                        EndColumn = columnCount + columnOffset
+                    };
+                    ilProcessor.Append(nop);
+                    ilProcessor.Body.Method.DebugInformation.SequencePoints.Add(sequencePoint);
+                    */
 
+                    if (IncludeSafetyChecks)
+                    {
+                        ilProcessor.Emit(OpCodes.Ldloc, References.ExceptionHandlerVariable);
+                        ilProcessor.Emit(OpCodes.Ldc_I4, ptr + ptrOffset);
+                        ilProcessor.Emit(OpCodes.Stfld, References.ExceptionHandlerCurrentCharacterField);
+                    }
+                }
+            }
+        }
+    }
+}
+
+
+                /*
                 switch (c)
                 {
                     case '+':
                         // Memory[MemoryPointer] = (byte)(Memory[MemoryPointer] + 1);
-                        _ilProcessor.Emit(OpCodes.Ldsfld, _memoryArrayField);
-                        _ilProcessor.Emit(OpCodes.Ldsfld, _memoryPointerField);
+                        ilProcessor.Emit(OpCodes.Ldsfld, References.MemoryArrayField);
+                        ilProcessor.Emit(OpCodes.Ldsfld, References.MemoryPointerField);
                         
-                        _ilProcessor.Emit(OpCodes.Ldsfld, _memoryArrayField);
-                        _ilProcessor.Emit(OpCodes.Ldsfld, _memoryPointerField);
-                        _ilProcessor.Emit(OpCodes.Ldelem_U1);
-                        _ilProcessor.Emit(OpCodes.Ldc_I4_1);
-                        _ilProcessor.Emit(OpCodes.Add);
+                        ilProcessor.Emit(OpCodes.Ldsfld, References.MemoryArrayField);
+                        ilProcessor.Emit(OpCodes.Ldsfld, References.MemoryPointerField);
+                        ilProcessor.Emit(OpCodes.Ldelem_U1);
+                        ilProcessor.Emit(OpCodes.Ldc_I4_1);
+                        ilProcessor.Emit(OpCodes.Add);
 
-                        _ilProcessor.Emit(OpCodes.Stelem_I1);
+                        ilProcessor.Emit(OpCodes.Stelem_I1);
                         break;
                     case '-':
                         // Memory[MemoryPointer] = (byte)(Memory[MemoryPointer] - 1);
-                        _ilProcessor.Emit(OpCodes.Ldsfld, _memoryArrayField);
-                        _ilProcessor.Emit(OpCodes.Ldsfld, _memoryPointerField);
+                        ilProcessor.Emit(OpCodes.Ldsfld, References.MemoryArrayField);
+                        ilProcessor.Emit(OpCodes.Ldsfld, References.MemoryPointerField);
                         
-                        _ilProcessor.Emit(OpCodes.Ldsfld, _memoryArrayField);
-                        _ilProcessor.Emit(OpCodes.Ldsfld, _memoryPointerField);
-                        _ilProcessor.Emit(OpCodes.Ldelem_U1);
-                        _ilProcessor.Emit(OpCodes.Ldc_I4_1);
-                        _ilProcessor.Emit(OpCodes.Sub);
+                        ilProcessor.Emit(OpCodes.Ldsfld, References.MemoryArrayField);
+                        ilProcessor.Emit(OpCodes.Ldsfld, References.MemoryPointerField);
+                        ilProcessor.Emit(OpCodes.Ldelem_U1);
+                        ilProcessor.Emit(OpCodes.Ldc_I4_1);
+                        ilProcessor.Emit(OpCodes.Sub);
 
-                        _ilProcessor.Emit(OpCodes.Stelem_I1);
+                        ilProcessor.Emit(OpCodes.Stelem_I1);
                         break;
                     case '>':
                         // memoryPointer++
-                        _ilProcessor.Emit(OpCodes.Ldsfld, _memoryPointerField);
-                        _ilProcessor.Emit(OpCodes.Ldc_I4_1);
-                        _ilProcessor.Emit(OpCodes.Add);
-                        _ilProcessor.Emit(OpCodes.Stsfld, _memoryPointerField);
+                        ilProcessor.Emit(OpCodes.Ldsfld, References.MemoryPointerField);
+                        ilProcessor.Emit(OpCodes.Ldc_I4_1);
+                        ilProcessor.Emit(OpCodes.Add);
+                        ilProcessor.Emit(OpCodes.Stsfld, References.MemoryPointerField);
                         
                         if(IncludeSafetyChecks)
                         {
-                            _ilProcessor.Emit(OpCodes.Ldloc, exceptionHandlerVariable);
-                            _ilProcessor.Emit(OpCodes.Ldsfld, _memoryPointerField);
-                            _ilProcessor.Emit(OpCodes.Stfld, _exceptionHandlerCurrentMemoryPointerField);
+                            ilProcessor.Emit(OpCodes.Ldloc, exceptionHandlerVariable);
+                            ilProcessor.Emit(OpCodes.Ldsfld, References.MemoryPointerField);
+                            ilProcessor.Emit(OpCodes.Stfld, References.ExceptionHandlerCurrentMemoryPointerField);
                             
                             // if (MemoryPointer < Memory.Length)
-                            _ilProcessor.Emit(OpCodes.Ldsfld, _memoryPointerField);
-                            _ilProcessor.Emit(OpCodes.Ldsfld, _memoryArrayField);
-                            _ilProcessor.Emit(OpCodes.Ldlen);
-                            _ilProcessor.Emit(OpCodes.Conv_I4);
+                            ilProcessor.Emit(OpCodes.Ldsfld, References.MemoryPointerField);
+                            ilProcessor.Emit(OpCodes.Ldsfld, References.MemoryArrayField);
+                            ilProcessor.Emit(OpCodes.Ldlen);
+                            ilProcessor.Emit(OpCodes.Conv_I4);
 
                             nopEnd = Instruction.Create(OpCodes.Nop);
                             var nopEnd2 = Instruction.Create(OpCodes.Nop);
-                            _ilProcessor.Emit(OpCodes.Bge, nopEnd);
-                            _ilProcessor.Emit(OpCodes.Br, nopEnd2);
-                            _ilProcessor.Append(nopEnd);
-                            _ilProcessor.Emit(OpCodes.Ldstr, MemoryPointerOutOfBounds.Overflow);
-                            _ilProcessor.Emit(OpCodes.Newobj, _ptrOutOfBoundsConstructor);
-                            _ilProcessor.Emit(OpCodes.Throw);
-                            _ilProcessor.Append(nopEnd2);
+                            ilProcessor.Emit(OpCodes.Bge, nopEnd);
+                            ilProcessor.Emit(OpCodes.Br, nopEnd2);
+                            ilProcessor.Append(nopEnd);
+                            ilProcessor.Emit(OpCodes.Ldstr, MemoryPointerOutOfBounds.Overflow);
+                            ilProcessor.Emit(OpCodes.Newobj, References.PtrOutOfBoundsConstructor);
+                            ilProcessor.Emit(OpCodes.Throw);
+                            ilProcessor.Append(nopEnd2);
                         }
                         break;
                     case '<':
                         // memoryPointer--
-                        _ilProcessor.Emit(OpCodes.Ldsfld, _memoryPointerField);
-                        _ilProcessor.Emit(OpCodes.Ldc_I4_1);
-                        _ilProcessor.Emit(OpCodes.Sub);
-                        _ilProcessor.Emit(OpCodes.Stsfld, _memoryPointerField);
+                        ilProcessor.Emit(OpCodes.Ldsfld, References.MemoryPointerField);
+                        ilProcessor.Emit(OpCodes.Ldc_I4_1);
+                        ilProcessor.Emit(OpCodes.Sub);
+                        ilProcessor.Emit(OpCodes.Stsfld, References.MemoryPointerField);
                         
                         if(IncludeSafetyChecks)
                         {
-                            _ilProcessor.Emit(OpCodes.Ldloc, exceptionHandlerVariable);
-                            _ilProcessor.Emit(OpCodes.Ldsfld, _memoryPointerField);
-                            _ilProcessor.Emit(OpCodes.Stfld, _exceptionHandlerCurrentMemoryPointerField);
+                            ilProcessor.Emit(OpCodes.Ldloc, exceptionHandlerVariable);
+                            ilProcessor.Emit(OpCodes.Ldsfld, References.MemoryPointerField);
+                            ilProcessor.Emit(OpCodes.Stfld, References.ExceptionHandlerCurrentMemoryPointerField);
                             
                             // if (0 > MemoryPointer)
-                            _ilProcessor.Emit(OpCodes.Ldc_I4_0);
-                            _ilProcessor.Emit(OpCodes.Ldsfld, _memoryPointerField);
-                            _ilProcessor.Emit(OpCodes.Cgt);
+                            ilProcessor.Emit(OpCodes.Ldc_I4_0);
+                            ilProcessor.Emit(OpCodes.Ldsfld, References.MemoryPointerField);
+                            ilProcessor.Emit(OpCodes.Cgt);
 
                             nopEnd = Instruction.Create(OpCodes.Nop);
-                            _ilProcessor.Emit(OpCodes.Brfalse, nopEnd);
-                            _ilProcessor.Emit(OpCodes.Ldstr, MemoryPointerOutOfBounds.Underflow);
-                            _ilProcessor.Emit(OpCodes.Newobj, _ptrOutOfBoundsConstructor);
-                            _ilProcessor.Emit(OpCodes.Throw);
-                            _ilProcessor.Append(nopEnd);
+                            ilProcessor.Emit(OpCodes.Brfalse, nopEnd);
+                            ilProcessor.Emit(OpCodes.Ldstr, MemoryPointerOutOfBounds.Underflow);
+                            ilProcessor.Emit(OpCodes.Newobj, References.PtrOutOfBoundsConstructor);
+                            ilProcessor.Emit(OpCodes.Throw);
+                            ilProcessor.Append(nopEnd);
                         }
                         break;
                     case '[':
@@ -262,35 +312,32 @@ namespace BrainSharp
                         var start = Instruction.Create(OpCodes.Nop);
                         var end = Instruction.Create(OpCodes.Nop);
 
-                        _ilProcessor.Append(start);
-                        _ilProcessor.Emit(OpCodes.Ldsfld, _memoryArrayField);
-                        _ilProcessor.Emit(OpCodes.Ldsfld, _memoryPointerField);
-                        _ilProcessor.Emit(OpCodes.Ldelem_U1);
-                        _ilProcessor.Emit(OpCodes.Brfalse, end);
+                        ilProcessor.Append(start);
+                        ilProcessor.Emit(OpCodes.Ldsfld, References.MemoryArrayField);
+                        ilProcessor.Emit(OpCodes.Ldsfld, References.MemoryPointerField);
+                        ilProcessor.Emit(OpCodes.Ldelem_U1);
+                        ilProcessor.Emit(OpCodes.Brfalse, end);
                         
                         // ptrOffset is purely used for exception handling checking
-                        _compilerIteration(bracketCode.ToString(), exceptionHandlerVariable, ptr + 1);
+                        _compilerIteration(bracketCode.ToString(), exceptionHandlerVariable, ptr + 1, lineCount);
                         
-                        _ilProcessor.Emit(OpCodes.Br, start);
-                        _ilProcessor.Append(end);
+                        ilProcessor.Emit(OpCodes.Br, start);
+                        ilProcessor.Append(end);
                         ptr = tempPtr;
                         break;
                     case ']':
                         break;
                     case '.':
-                        _ilProcessor.Emit(OpCodes.Ldsfld, _memoryArrayField);
-                        _ilProcessor.Emit(OpCodes.Ldsfld, _memoryPointerField);
-                        _ilProcessor.Emit(OpCodes.Ldelem_U1);
-                        _ilProcessor.Emit(OpCodes.Call, _consoleWriteMethod);
+                        ilProcessor.Emit(OpCodes.Ldsfld, References.MemoryArrayField);
+                        ilProcessor.Emit(OpCodes.Ldsfld, References.MemoryPointerField);
+                        ilProcessor.Emit(OpCodes.Ldelem_U1);
+                        ilProcessor.Emit(OpCodes.Call, References.ConsoleWriteMethod);
                         break;
                     case ',':
-                        _ilProcessor.Emit(OpCodes.Ldsfld, _memoryArrayField);
-                        _ilProcessor.Emit(OpCodes.Ldsfld, _memoryPointerField);
-                        _ilProcessor.Emit(OpCodes.Call, _consoleReadMethod);
-                        _ilProcessor.Emit(OpCodes.Stelem_I1);
+                        ilProcessor.Emit(OpCodes.Ldsfld, References.MemoryArrayField);
+                        ilProcessor.Emit(OpCodes.Ldsfld, References.MemoryPointerField);
+                        ilProcessor.Emit(OpCodes.Call, References.ConsoleReadMethod);
+                        ilProcessor.Emit(OpCodes.Stelem_I1);
                         break;
                 }
-            }
-        }
-    }
-}
+                */

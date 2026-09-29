@@ -68,9 +68,15 @@
     </ItemGroup>
     <ItemGroup>
         <Compile Include="Compiler.cs" />
+        <Compile Include="CompilerReferences.cs" />
         <Compile Include="Exceptions\BrainFuckSyntaxException.cs" />
         <Compile Include="Exceptions\InvalidLoopException.cs" />
         <Compile Include="Interpreter.cs" />
+        <Compile Include="Processors\ArithmeticProcessors.cs" />
+        <Compile Include="Processors\ConsoleProcessors.cs" />
+        <Compile Include="Processors\IBrainFuckCharacterProcessor.cs" />
+        <Compile Include="Processors\LoopProcessor.cs" />
+        <Compile Include="Processors\MemoryPointerProcessors.cs" />
         <Compile Include="Program.cs" />
         <Compile Include="Properties\AssemblyInfo.cs" />
     </ItemGroup>
@@ -78,9 +84,9 @@
       <None Include="packages.config" />
     </ItemGroup>
     <ItemGroup>
-      <ProjectReference Include="..\BrainSharp Runtime\BrainSharp Runtime.csproj">
+      <ProjectReference Include="..\BrainSharp.Runtime\BrainSharp.Runtime.csproj">
         <Project>{5e8dadc3-5941-487f-8b18-17d35033b7df}</Project>
-        <Name>BrainSharp Runtime</Name>
+        <Name>BrainSharp.Runtime</Name>
       </ProjectReference>
     </ItemGroup>
     <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />

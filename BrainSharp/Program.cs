@@ -18,18 +18,28 @@ namespace BrainSharp
             All
         }
         
-        // Source - https://stackoverflow.com/a/63021455
-        // Posted by John Gietzen, modified by community. See post 'Timeline' for change history
-        // Retrieved 2026-09-29, License - CC BY-SA 4.0
-        public static string Where(string file)
+        static bool IsDotnetToolInstalled(string toolName)
         {
-            var paths = Environment.GetEnvironmentVariable("PATH").Split(';');
-            var extensions = Environment.GetEnvironmentVariable("PATHEXT").Split(';');
-            return (from p in new[] { Environment.CurrentDirectory }.Concat(paths)
-                from e in new[] { string.Empty }.Concat(extensions)
-                let path = Path.Combine(p.Trim(), file + e.ToLower())
-                where File.Exists(path)
-                select path).FirstOrDefault();
+            var psi = new ProcessStartInfo
+            {
+                FileName = "dotnet",
+                Arguments = "tool list --global",
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                CreateNoWindow = true
+            };
+
+            using var process = Process.Start(psi);
+            if (process == null)
+                return false;
+
+            string output = process.StandardOutput.ReadToEnd();
+            process.WaitForExit();
+
+            return output
+                .Split(new []{'\n'}, StringSplitOptions.RemoveEmptyEntries)
+                .Any(line => line.TrimStart().StartsWith(toolName + " "));
         }
         
         public static int Main(string[] args)
@@ -98,11 +108,9 @@ namespace BrainSharp
                 }
             }
 
-            string ilrepackLoc = "";
             if (embedLevel != EmbedLevel.None)
             {
-                ilrepackLoc = Where("ilrepack");
-                if(string.IsNullOrWhiteSpace(ilrepackLoc))
+                if(IsDotnetToolInstalled("ilrepack"))
                 {
                     Console.ForegroundColor = ConsoleColor.Red;
                     Console.WriteLine("ilrepack not installed, run 'dotnet tool install -g dotnet-ilrepack' to install!");
@@ -147,13 +155,18 @@ namespace BrainSharp
                     il.Emit(OpCodes.Ret);
 
                     string fileName = Path.GetFileNameWithoutExtension(programPath);
-                    assembly.Write(fileName + ".exe");
+                    var writerParams = new WriterParameters
+                    {
+                        WriteSymbols = true,
+                        SymbolWriterProvider = new PortablePdbWriterProvider()
+                    };
+                    assembly.Write(fileName + ".exe", writerParams);
 
                     if(embedLevel != EmbedLevel.None)
                     {
                         var processInfo = new ProcessStartInfo
                         {
-                            FileName = ilrepackLoc,
+                            FileName = "ilrepack",
                             Arguments = "",
                             UseShellExecute = false,
                             CreateNoWindow = true
@@ -161,10 +174,10 @@ namespace BrainSharp
                         switch (embedLevel)
                         {
                             case EmbedLevel.Runtime:
-                                processInfo.Arguments += $"/out:{fileName}.exe {fileName}.exe .\\BrainSharp.Runtime.dll";
+                                processInfo.Arguments += $"/out:{fileName}.exe {fileName}.exe BrainSharp.Runtime.dll";
                                 break;
                             case EmbedLevel.All:
-                                processInfo.Arguments += $"/out:{fileName}.exe {fileName}.exe .\\System.Memory.dll .\\BrainSharp.Runtime.dll";
+                                processInfo.Arguments += $"/out:{fileName}.exe {fileName}.exe System.Memory.dll BrainSharp.Runtime.dll";
                                 break;
                         }
                         Process.Start(processInfo);
@@ -175,6 +188,10 @@ namespace BrainSharp
             }
             else
             {
+                Console.ForegroundColor = ConsoleColor.Yellow;
+                Console.WriteLine("Warning: The interpreter is deprecated and isn't compatible with custom character processors.");
+                Console.ResetColor();
+                
                 Interpreter.IncludeSafetyChecks = includeSafetyChecks;
                 Interpreter.AllocatedBytes = allocatedBytes;
                 Interpreter.MemoryTrack = memoryTrack;
