@@ -62,11 +62,8 @@ namespace BrainSharp
                 for (var index = 0; index < args.Length; index++)
                 {
                     var arg = args[index];
-                    if (string.Equals(arg, "--unsafe", StringComparison.CurrentCultureIgnoreCase) ||
-                        string.Equals(arg, "-u", StringComparison.CurrentCultureIgnoreCase))
-                        includeSafetyChecks = false;
-                    if (string.Equals(arg, "--safe", StringComparison.CurrentCultureIgnoreCase) ||
-                        string.Equals(arg, "-s", StringComparison.CurrentCultureIgnoreCase))
+                    if (string.Equals(arg, "--debug", StringComparison.CurrentCultureIgnoreCase) ||
+                        string.Equals(arg, "-d", StringComparison.CurrentCultureIgnoreCase))
                         includeSafetyChecks = true;
                     if (string.Equals(arg, "--allocate", StringComparison.CurrentCultureIgnoreCase) ||
                         string.Equals(arg, "-a", StringComparison.CurrentCultureIgnoreCase))
