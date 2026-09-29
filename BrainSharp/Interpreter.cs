@@ -52,13 +52,13 @@ namespace BrainSharp
                         case '>':
                             memPtr++;
                             watcher.CurrentMemorySpaceIndex = memPtr;
-                            if (memPtr >= memory.Length)
+                            if (IncludeSafetyChecks && memPtr >= memory.Length)
                                 throw new MemoryPointerOutOfBounds(MemoryPointerOutOfBounds.Overflow);
                             break;
                         case '<':
                             memPtr--;
                             watcher.CurrentMemorySpaceIndex = memPtr;
-                            if (memPtr < 0)
+                            if (IncludeSafetyChecks && memPtr < 0)
                                 throw new MemoryPointerOutOfBounds(MemoryPointerOutOfBounds.Underflow);
                             break;
                         case '[':
