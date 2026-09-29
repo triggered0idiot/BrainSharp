@@ -70,7 +70,7 @@ namespace BrainSharp
                     if (string.Equals(arg, "--compile", StringComparison.CurrentCultureIgnoreCase) ||
                         string.Equals(arg, "-c", StringComparison.CurrentCultureIgnoreCase))
                         compileMode = true;
-                    if (string.Equals(arg, "--embedded", StringComparison.CurrentCultureIgnoreCase) ||
+                    if (string.Equals(arg, "--embed", StringComparison.CurrentCultureIgnoreCase) ||
                         string.Equals(arg, "-e", StringComparison.CurrentCultureIgnoreCase))
                     {
                         int newIndex = index+1;
