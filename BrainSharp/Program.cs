@@ -51,6 +51,7 @@ namespace BrainSharp
             
             // compiler specific
             EmbedLevel embedLevel = EmbedLevel.None;
+            bool optimise = false;
             
             // interp specific
             bool memoryTrack = false;
@@ -94,6 +95,9 @@ namespace BrainSharp
                                 embedLevel = EmbedLevel.All;
                         }
                     }
+                    if (string.Equals(arg, "--optimise", StringComparison.CurrentCultureIgnoreCase) ||
+                        string.Equals(arg, "-o", StringComparison.CurrentCultureIgnoreCase))
+                        optimise = true;
                     
                     // interp specific
                     if (string.Equals(arg, "--execute", StringComparison.CurrentCultureIgnoreCase) ||
@@ -145,7 +149,7 @@ namespace BrainSharp
                     mainMethod.Body.Variables.Add(tempByteVar);
                     var il = mainMethod.Body.GetILProcessor();
 
-                    var brainfuckCompiler = new Compiler(il, includeSafetyChecks, allocatedBytes);
+                    var brainfuckCompiler = new Compiler(il, includeSafetyChecks, allocatedBytes, optimise);
                     brainfuckCompiler.Compile(code);
 
                     il.Emit(OpCodes.Nop);

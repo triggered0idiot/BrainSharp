@@ -4,7 +4,7 @@ fun little side project because i was bored
 preferably with credit (i.e BrainSharp from triggered0idiot on github)<br>
 but you *must* follow the license<br>
 # Future?
-i'll probably add a bit more features if i get bored again (raylib??? jk) and maybe optimise the il output a bit (e.g grouping several ++ into one +=)<br>
+i'll probably add a bit more features if i get bored again (raylib??? jk)<br>
 # Command Line Params
 (arg 1 has to be the program)<br>
 (example: ./BrainSharp.exe helloworld.bf --compile --allocate 8 --debug)<br>
@@ -14,6 +14,10 @@ enables bounds checks, proper error handling and program debug information<br>
 specify allocated bytes to brainfuck program<br>
 --compile | -c<br>
 compile brainfuck to .net framework app<br>
+--optimise | -o<br>
+combines several sequential + and - operations<br>
+combines several sequential > and < operations<br>
+removes [] loops with no valid code inside<br>
 --execute | -e<br>
 executes the brainfuck code in an interp<br>
 --track | -t<br>

@@ -32,6 +32,27 @@ namespace BrainSharp.Processors
                 bracketCode.Append(code[tempPtr]);
             }
 
+            string strBracketCode = bracketCode.ToString();
+            if (compiler.OptimiseCode)
+            {
+                bool IsCodeUsed()
+                {
+                    for (int i = 0; i < strBracketCode.Length; i++)
+                    {
+                        foreach (var characterProcessor in Compiler.CharacterProcessors)
+                        {
+                            if (characterProcessor.FlagCharacter(strBracketCode, i))
+                                return true;
+                        }
+                    }
+
+                    return false;
+                }
+
+                if (!IsCodeUsed())
+                    return;
+            }
+
             var start = Instruction.Create(OpCodes.Nop);
             var end = Instruction.Create(OpCodes.Nop);
 
@@ -40,9 +61,9 @@ namespace BrainSharp.Processors
             processor.Emit(OpCodes.Ldsfld, references.MemoryPointerField);
             processor.Emit(OpCodes.Ldelem_U1);
             processor.Emit(OpCodes.Brfalse, end);
-                        
+            
             // ptrOffset is purely used for exception handling checking
-            compiler.CompilerIteration(bracketCode.ToString(), currentCharacterIndex + 1);
+            compiler.CompilerIteration(strBracketCode, currentCharacterIndex + 1);
                         
             processor.Emit(OpCodes.Br, start);
             processor.Append(end);

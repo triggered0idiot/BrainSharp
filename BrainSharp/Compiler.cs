@@ -42,6 +42,7 @@ namespace BrainSharp
         
         public readonly bool IncludeSafetyChecks;
         public readonly int AllocatedBytes;
+        public readonly bool OptimiseCode;
         
         public readonly CompilerReferences References = new();
         
@@ -52,8 +53,9 @@ namespace BrainSharp
         /// <param name="ilProcessor">The il processor to append compiled code to</param>
         /// <param name="includeSafetyChecks">When true extra checks are added to the compiled code to throw an error when an invalid state occurs</param>
         /// <param name="allocatedBytes">How much memory space to allocate to the program, unlike some other brainfuck interpreters memory isn't allocated dynamically</param>
-        public Compiler(ILProcessor ilProcessor, bool includeSafetyChecks = false, int allocatedBytes = 8192)
+        public Compiler(ILProcessor ilProcessor, bool includeSafetyChecks = false, int allocatedBytes = 8192, bool optimise = false)
         {
+            OptimiseCode =  optimise;
             References.IlProcessor = ilProcessor;
             IncludeSafetyChecks = includeSafetyChecks;
             AllocatedBytes = allocatedBytes;
