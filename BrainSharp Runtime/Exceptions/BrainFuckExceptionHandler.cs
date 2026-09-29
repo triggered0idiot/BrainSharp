@@ -40,17 +40,15 @@ public class BrainFuckExceptionHandler : IDisposable
 
     private void _handleException(object sender, UnhandledExceptionEventArgs args)
     {
-        if (args.ExceptionObject.GetType().IsSubclassOf(typeof(BrainFuckRuntimeException)))
-            ExceptionCaught(args.ExceptionObject as BrainFuckRuntimeException);
+        ExceptionCaught(args.ExceptionObject as Exception);
     }
 
-    public void ExceptionCaught(BrainFuckRuntimeException exception)
+    public void ExceptionCaught(Exception exception)
     {
         int lineIndex = 0;
         int characterIndex = 0;
-        for (int i = 0; i < _executingCode.Length; i++)
+        foreach (var c in _executingCode)
         {
-            char c = _executingCode[i];
             characterIndex++;
             if(characterIndex == CurrentCharacterIndex)
                 break;
