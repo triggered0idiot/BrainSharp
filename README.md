@@ -1,5 +1,8 @@
 # BrainSharp
 fun little side project because i was bored
+# Can I Use
+with credit (i.e BrainSharp from triggered0idiot on github)<br>
+no license right now because i can't imagine anyone using this<br>
 # Future?
 i'll probably add a bit more features if i get bored again (raylib??? jk) and maybe optimise the il output a bit (e.g grouping several ++ into one +=)<br>
 # Command Line Params
