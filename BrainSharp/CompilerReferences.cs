@@ -20,8 +20,12 @@ namespace BrainSharp.Processors
         public MethodReference ExceptionHandlerConstructor;
         public FieldReference ExceptionHandlerCurrentCharacterField;
         public FieldReference ExceptionHandlerCurrentMemoryPointerField;
+        public FieldReference ExceptionHandlerCurrentCodeScopeField;
+        
         public MethodReference MemoryByteConstructor;
         public MethodReference DisposeMethod;
+        
+        public MethodReference RuntimeConfigArgsMethod; 
 
         public VariableDefinition ExceptionHandlerVariable;
     }

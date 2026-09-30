@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using BrainSharp.Exceptions;
+using BrainSharp.Runtime;
 using BrainSharp.Runtime.Exceptions;
 
 namespace BrainSharp
@@ -94,7 +95,7 @@ namespace BrainSharp
                             Console.Write((char)memory[memPtr]);
                             break;
                         case ',':
-                            memory[memPtr] = (byte)Console.Read();
+                            memory[memPtr] = (byte)ConsoleReader.ReadOrPoll();
                             break;
                     }
 

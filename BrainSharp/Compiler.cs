@@ -4,6 +4,7 @@ using System.Reflection;
 using System.Text;
 using BrainSharp.Exceptions;
 using BrainSharp.Processors;
+using BrainSharp.Runtime;
 using BrainSharp.Runtime.Exceptions;
 using Mono.Cecil;
 using Mono.Cecil.Cil;
@@ -76,14 +77,20 @@ namespace BrainSharp
                 targetModule.ImportReference(typeof(BrainFuckExceptionHandler).GetField("CurrentCharacterIndex"));
             References.ExceptionHandlerCurrentMemoryPointerField =
                 targetModule.ImportReference(typeof(BrainFuckExceptionHandler).GetField("CurrentMemorySpaceIndex"));
+            References.ExceptionHandlerCurrentCodeScopeField = 
+                targetModule.ImportReference(typeof(BrainFuckExceptionHandler).GetField("CurrentCodeScope"));
+            
             References.DisposeMethod =
                 targetModule.ImportReference(typeof(IDisposable).GetMethod("Dispose"));
             References.MemoryByteConstructor = 
                 targetModule.ImportReference(typeof(Memory<byte>).GetConstructor(new[] { typeof(byte[]) }));
             
+            References.RuntimeConfigArgsMethod = 
+                targetModule.ImportReference(typeof(BrainFuckRuntimeConfig).GetMethod("ConfigFromArgs"));
+            
             References.ConsoleWriteMethod = targetModule.ImportReference(typeof(Console).GetMethod("Write",
                 new[] { typeof(char) }));
-            References.ConsoleReadMethod = targetModule.ImportReference(typeof(Console).GetMethod("Read", Type.EmptyTypes));
+            References.ConsoleReadMethod = targetModule.ImportReference(typeof(ConsoleReader).GetMethod("ReadOrPoll", Type.EmptyTypes));
 
             References.MemoryArrayField = new FieldDefinition("Memory",
                 FieldAttributes.Public | FieldAttributes.Static, new ArrayType(targetModule.TypeSystem.Byte));
@@ -94,6 +101,9 @@ namespace BrainSharp
 
             var tempByteVar = new VariableDefinition(targetModule.TypeSystem.Byte);
             targetBody.Variables.Add(tempByteVar);
+            
+            ilProcessor.Emit(OpCodes.Ldarg_0);
+            ilProcessor.Emit(OpCodes.Call, References.RuntimeConfigArgsMethod);
             
             // Memory = new byte[AllocatedBytes]
             ilProcessor.Emit(OpCodes.Ldc_I4, AllocatedBytes);
@@ -163,43 +173,37 @@ namespace BrainSharp
         internal void CompilerIteration(string code, int ptrOffset = 0)
         {
             var ilProcessor = References.IlProcessor;
+            if (IncludeSafetyChecks)
+            {
+                ilProcessor.Emit(OpCodes.Ldloc, References.ExceptionHandlerVariable);
+                ilProcessor.Emit(OpCodes.Ldstr, code);
+                ilProcessor.Emit(OpCodes.Stfld, References.ExceptionHandlerCurrentCodeScopeField);
+            }
             int ptr = -1;
             while (++ptr < code.Length)
             {
-                bool processed = false;
+                List<IBrainFuckCharacterProcessor> targetProcessors = new();
                 foreach (var processor in CharacterProcessors)
                 {
                     if (processor.FlagCharacter(code, ptr))
                     {
-                        processor.ProcessCharacter(code, ref ptr, ilProcessor, this);
-                        processed = true;
+                        targetProcessors.Add(processor);
                     }
                 }
-                
-                if(processed)
-                {
-                    var nop = Instruction.Create(OpCodes.Nop);
-                    
-                    // TODO: fix/impl properly maybe?
-                    /*
-                    var sequencePoint = new SequencePoint(nop, new Document("main.bf"))
-                    {
-                        StartLine = lineCount + lineOffset,
-                        StartColumn = columnCount + columnOffset,
-                        EndLine = lineCount + lineOffset,
-                        EndColumn = columnCount + columnOffset
-                    };
-                    ilProcessor.Append(nop);
-                    ilProcessor.Body.Method.DebugInformation.SequencePoints.Add(sequencePoint);
-                    */
 
+                if (targetProcessors.Count > 0)
+                {
                     if (IncludeSafetyChecks)
                     {
                         ilProcessor.Emit(OpCodes.Ldloc, References.ExceptionHandlerVariable);
-                        ilProcessor.Emit(OpCodes.Ldc_I4, ptr + ptrOffset);
+                        ilProcessor.Emit(OpCodes.Ldc_I4, ptr);// + ptrOffset);
                         ilProcessor.Emit(OpCodes.Stfld, References.ExceptionHandlerCurrentCharacterField);
                     }
+
+                    foreach (var processor in targetProcessors)
+                        processor.ProcessCharacter(code, ref ptr, ilProcessor, this);
                 }
+                
             }
         }
     }

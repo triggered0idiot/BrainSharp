@@ -55,10 +55,12 @@
         <Reference Include="System.Xml"/>
     </ItemGroup>
     <ItemGroup>
+        <Compile Include="ConsoleReader.cs" />
         <Compile Include="Exceptions\BrainFuckExceptionHandler.cs" />
         <Compile Include="Exceptions\BrainFuckRuntimeException.cs" />
         <Compile Include="Exceptions\MemoryPointerOutOfBounds.cs" />
         <Compile Include="Properties\AssemblyInfo.cs"/>
+        <Compile Include="BrainFuckRuntimeConfig.cs" />
     </ItemGroup>
     <ItemGroup>
       <None Include="packages.config" />

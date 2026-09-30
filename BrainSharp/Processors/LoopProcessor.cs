@@ -13,6 +13,7 @@ namespace BrainSharp.Processors
 
         public void ProcessCharacter(string code, ref int currentCharacterIndex, ILProcessor processor, Compiler compiler)
         {
+
             var references = compiler.References;
             
             int b = 1;
@@ -50,7 +51,10 @@ namespace BrainSharp.Processors
                 }
 
                 if (!IsCodeUsed())
+                {
+                    currentCharacterIndex = tempPtr;
                     return;
+                }
             }
 
             var start = Instruction.Create(OpCodes.Nop);

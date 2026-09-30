@@ -122,7 +122,7 @@ namespace BrainSharp.Processors
                         
             if(compiler.IncludeSafetyChecks)
             {
-                if(subValue > 0)
+                if(subValue < 0)
                     IncrementMemoryPointerProcessor.AddSafetyCheck(code, ref currentCharacterIndex, processor, compiler);
                 else
                     DecrementMemoryPointerProcessor.AddSafetyCheck(code, ref currentCharacterIndex, processor, compiler);

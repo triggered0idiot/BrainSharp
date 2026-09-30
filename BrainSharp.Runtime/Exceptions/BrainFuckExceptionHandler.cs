@@ -16,9 +16,11 @@ namespace BrainSharp.Runtime.Exceptions
         private Memory<byte> _memorySpace = Array.Empty<byte>();
         private string _executingCode;
         private readonly Stopwatch _stopwatch;
+        public string CurrentCodeScope; //TODO: a better way
     
         public BrainFuckExceptionHandler(string currentCode)
         {
+            CurrentCodeScope = currentCode;
             _executingCode = currentCode;
             AppDomain.CurrentDomain.UnhandledException += _handleException;
             _stopwatch = Stopwatch.StartNew();
@@ -26,6 +28,7 @@ namespace BrainSharp.Runtime.Exceptions
     
         public BrainFuckExceptionHandler(string currentCode, Memory<byte> memorySpace)
         {
+            CurrentCodeScope = currentCode;
             _executingCode = currentCode;
             _memorySpace = memorySpace;
             AppDomain.CurrentDomain.UnhandledException += _handleException;
@@ -39,6 +42,7 @@ namespace BrainSharp.Runtime.Exceptions
 
             _disposed = true;
             _stopwatch.Stop();
+            Console.Write('\n');
             Console.WriteLine($"Program took {_stopwatch.ElapsedMilliseconds}ms to run");
             // weird offset thing so that the object doesn't dispose before it can catch the exception
             Task.Run(() =>
@@ -56,10 +60,11 @@ namespace BrainSharp.Runtime.Exceptions
         {
             int lineIndex = 0;
             int characterIndex = 0;
-            foreach (var c in _executingCode)
+            for (var index = 0; index < _executingCode.Length; index++)
             {
+                var c = _executingCode[index];
                 characterIndex++;
-                if(characterIndex == CurrentCharacterIndex)
+                if (index == CurrentCharacterIndex)
                     break;
                 if (c == '\n')
                 {
@@ -67,7 +72,7 @@ namespace BrainSharp.Runtime.Exceptions
                     characterIndex = 0;
                 }
             }
-        
+
             Console.ForegroundColor = ConsoleColor.Red;
             Console.WriteLine($"Exception caught at {lineIndex}:{characterIndex}");
             Console.WriteLine(exception.Message);
@@ -84,13 +89,13 @@ namespace BrainSharp.Runtime.Exceptions
                 if(i == 0)
                     Console.ForegroundColor = ConsoleColor.Cyan;
             
-                if(realIndex < 0 || realIndex >= _executingCode.Length)
+                if(realIndex < 0 || realIndex >= CurrentCodeScope.Length)
                 {
                     Console.Write(' ');
                     continue;
                 }
             
-                Console.Write(_executingCode[realIndex]);
+                Console.Write(CurrentCodeScope[realIndex]);
             }
             Console.Write('\n');
         
